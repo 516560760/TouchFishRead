@@ -1,0 +1,120 @@
+
+local cjson = require('cjson')
+
+local CMD_SUCCESS = 0
+local CMD_FAILED = -1
+
+local file = nil
+local filename = nil
+local file_seeks = {}
+local file_seeks_offset = 0
+local libstruct = {}
+local CMD = {}
+
+print = function(...)
+    io.output():write(...)
+end
+function initfile(name)
+    filename = name
+    table.insert(file_seeks, 0)
+    while true do
+        local line = file:read('*l')
+        if not line then break end
+        table.insert(file_seeks, file:seek('cur', 0))
+    end
+    local libfile = io.open("libfile", "r")
+    if libfile then
+        local struct = libfile:read('*a')
+        libfile:close()
+        libstruct = cjson.decode(struct)
+        file_seeks_offset = libstruct[filename] or 0
+    end
+    
+    updatestruct()
+end
+
+function updatestruct()
+    local libfile = io.open("./libfile", "w+")
+    libstruct[filename] = file_seeks_offset
+    libfile:write(cjson.encode(libstruct))
+    libfile:flush()
+    libfile:close()
+end
+
+function readfile()
+    if not file then return end
+    local seek = file_seeks[file_seeks_offset]
+    file:seek('set', seek)
+    local line = file:read('*l')
+    if line then
+        print(line)
+    end
+end
+
+CMD.j = function()
+    if file_seeks_offset <= 1 then return end
+    file_seeks_offset = file_seeks_offset - 1
+    updatestruct()
+    readfile()
+end
+CMD.J = CMD.j
+
+CMD.k = function(backtracking)
+    if file_seeks_offset >= #file_seeks then return end
+    file_seeks_offset = file_seeks_offset + 1
+    updatestruct()
+    readfile()
+end
+CMD.K = CMD.k
+
+CMD.b = function()
+    print('You see this sentence, it means you see this sentence.')
+end
+CMD.B = CMD.b
+
+CMD.s = function()
+    readfile()
+end
+CMD.S = CMD.s
+
+CMD.h = function()
+    print("press 's' to show current line.\n")
+    print("press 'b' to show an sentence(boss key).\n")
+    print("press 'j' to show last line.\n")
+    print("press 'k' to show next line.\n")
+    print("press 'q' to quit.\n")
+    print("press 'h' for help.")
+end
+CMD.H = CMD.h
+
+function CHECK_CMD(cmd)
+    if CMD[cmd] then
+        return CMD_SUCCESS
+    else
+        return CMD_FAILED
+    end
+end
+
+function EXEC_CMD(cmd)
+    CMD[cmd]()
+    return 0
+end
+
+function LOAD_FILE(name)
+    file = io.open(string.format("./%s", name), "r")
+    if file then
+        print("wait please in loading...\n")
+        initfile(name)
+        print("loading success, welcome come touchfish! --by Gx.\npress 'h' for help.")
+        return CMD_SUCCESS
+    else
+        print("load failed file")
+        return CMD_FAILED
+    end
+end
+
+function EXIT(code)
+    if file then
+        file:close()
+    end
+end
