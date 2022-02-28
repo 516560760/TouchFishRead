@@ -41,13 +41,19 @@ function updatestruct()
     libfile:close()
 end
 
-function readfile()
+function readfile(continue)
     if not file then return end
     local seek = file_seeks[file_seeks_offset]
     file:seek('set', seek)
     local line = file:read('*l')
     if line then
-        print(line)
+        if #line > 0 then
+            print(line)
+        else
+            if continue then
+                continue()
+            end
+        end
     end
 end
 
@@ -55,7 +61,7 @@ CMD.j = function()
     if file_seeks_offset <= 1 then return end
     file_seeks_offset = file_seeks_offset - 1
     updatestruct()
-    readfile()
+    readfile(CMD.j)
 end
 CMD.J = CMD.j
 
@@ -63,7 +69,7 @@ CMD.k = function(backtracking)
     if file_seeks_offset >= #file_seeks then return end
     file_seeks_offset = file_seeks_offset + 1
     updatestruct()
-    readfile()
+    readfile(CMD.k)
 end
 CMD.K = CMD.k
 
