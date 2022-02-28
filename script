@@ -5,21 +5,61 @@ local CMD_SUCCESS = 0
 local CMD_FAILED = -1
 
 local file = nil
+local file_lines_cache = {}
 local filename = nil
 local file_seeks = {}
 local file_seeks_offset = 0
 local libstruct = {}
 local CMD = {}
+local SCMD = {}
 
 print = function(...)
     io.output():write(...)
 end
+
+function string.split(str, sep, count)
+    if not str then 
+    return 
+    end
+    if string.find(str, sep) == nil then
+        return { str }
+    end
+
+    if count==nil or count<1 then
+        count = 0
+    end
+
+    local result = {}
+    local n = 0
+    local p = "(.-)" .. sep
+    local nextPos = 1
+    while true do
+        n = n+1
+        if (count>0 and count<=n) then
+            result[n] = string.sub(str, nextPos)
+            break
+        end
+
+        local s, e, substr = string.find(str, p, nextPos)
+        if s==nil then
+            result[n] = string.sub(str, nextPos)
+            break
+        else
+            result[n] = substr
+            nextPos = e+1
+        end
+    end
+
+    return result
+end
+
 function initfile(name)
     filename = name
     table.insert(file_seeks, 0)
     while true do
         local line = file:read('*l')
         if not line then break end
+        table.insert(file_lines_cache, line)
         table.insert(file_seeks, file:seek('cur', 0))
     end
     local libfile = io.open("libfile", "r")
@@ -84,12 +124,15 @@ end
 CMD.S = CMD.s
 
 CMD.h = function()
+    print("press 'h' for help.\n")
     print("press 's' to show current line.\n")
     print("press 'b' to show an sentence(boss key).\n")
     print("press 'j' to show last line.\n")
     print("press 'k' to show next line.\n")
     print("press 'q' to quit.\n")
-    print("press 'h' for help.")
+    print("press 'i' to input other commond.\n")
+    print("  -  input find `xxx` to show all occurrences of lines and subscripts(support lua wildcards).\n")
+    print("  -  input jump `xxx` to skip to the first occurrence of the full text, often used with the 'jump' command.")
 end
 CMD.H = CMD.h
 
@@ -103,7 +146,58 @@ end
 
 function EXEC_CMD(cmd)
     CMD[cmd]()
-    return 0
+    return CMD_SUCCESS
+end
+
+SCMD.find = function(...)
+    local content = ...
+    local is_find = false
+    for i, value in ipairs(file_lines_cache) do
+        if value:find(content) then
+            is_find = true
+            print(string.format("seek index:%s content:%s\n", i, value))
+        end
+    end
+    if not is_find then
+        print("not found, please confirm the character accuracy.\n")
+    end
+end
+
+SCMD.jump = function(...)
+    local content = ...
+    local jump_seek
+    for i, value in ipairs(file_lines_cache) do
+        if value:find(content, nil, true) then
+            jump_seek = i
+            break
+        end
+    end
+    if jump_seek then
+        file_seeks_offset = jump_seek
+        updatestruct()
+        readfile()
+    else
+        print("not found, please confirm the character accuracy.\n")
+    end
+end
+
+function EXEC_SCMD(str)
+    if #str <= 0 then 
+        print("please enter the command and parameters, separated by spaces.")
+        return 
+    end
+    local pack = string.split(str, ' ')
+    local scmd = pack[1]
+    if not scmd then
+        print("please enter the command and parameters, separated by spaces.")
+        return 
+    end
+    if SCMD[scmd] then
+        SCMD[scmd](select(2, unpack(pack)))
+    else
+        print(string.format("'%s' command was not found, please expand it yourself.", scmd))
+    end
+    return CMD_SUCCESS
 end
 
 function LOAD_FILE(name)
