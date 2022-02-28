@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
 	int ret = luaL_dofile(L, "script");
 	if (ret)
 	{
-		printf("load main.lua failed");
+		printf("load script failed, check syntax error please.");
 		return EXIT_SUCCESS;
 	}
 	call_global_commond(L, "LOAD_FILE", argv[1]);
