@@ -1,12 +1,15 @@
 
 local cjson = require('cjson')
+-- local unicode = require('unicode')
 
 local CMD_SUCCESS = 0
 local CMD_FAILED = -1
 
 local file = nil
-local file_lines_cache = {}
 local filename = nil
+local directorywildcard = "第.+章"
+local file_lines_cache = {}
+local file_chapter_cacke = {}
 local file_seeks = {}
 local file_seeks_offset = 0
 local libstruct = {}
@@ -56,11 +59,17 @@ end
 function initfile(name)
     filename = name
     table.insert(file_seeks, 0)
+    local mulu = io.open("./directorywildcard", "r")
+    directorywildcard = mulu:read('*a')
+    mulu:close()
     while true do
         local line = file:read('*l')
         if not line then break end
         table.insert(file_lines_cache, line)
         table.insert(file_seeks, file:seek('cur', 0))
+        if line:find(directorywildcard) then
+            table.insert(file_chapter_cacke, {seek = file_seeks[#file_seeks - 1], seek_offset = #file_seeks - 1})
+        end
     end
     local libfile = io.open("libfile", "r")
     if libfile then
@@ -113,6 +122,45 @@ CMD.k = function(backtracking)
 end
 CMD.K = CMD.k
 
+CMD.c = function()
+    for i, line in ipairs(file_lines_cache) do
+        if line:find(directorywildcard) then
+            print(string.format("%s\n", line))
+        end
+    end
+end
+CMD.C = CMD.c
+
+CMD.z = function()
+    for chapter_offset = #file_chapter_cacke, 1, -1 do
+        if file_seeks[file_seeks_offset] >= file_chapter_cacke[chapter_offset].seek then
+            if file_chapter_cacke[chapter_offset - 1] then
+                file_seeks_offset = file_chapter_cacke[chapter_offset - 1].seek_offset
+            else
+                file_seeks_offset = file_chapter_cacke[chapter_offset].seek_offset
+            end
+            break
+        end
+    end
+    updatestruct()
+    readfile()
+end
+CMD.Z = CMD.z
+
+CMD.x = function()
+    for chapter_offset = #file_chapter_cacke, 1, -1 do
+        if file_seeks[file_seeks_offset] >= file_chapter_cacke[chapter_offset].seek then
+            if file_chapter_cacke[chapter_offset + 1] then
+                file_seeks_offset = file_chapter_cacke[chapter_offset + 1].seek_offset
+            end
+            break
+        end
+    end
+    updatestruct()
+    readfile()
+end
+CMD.X = CMD.x
+
 CMD.b = function()
     print('You see this sentence, it means you see this sentence.')
 end
@@ -129,10 +177,13 @@ CMD.h = function()
     print("press 'b' to show an sentence(boss key).\n")
     print("press 'j' to show last line.\n")
     print("press 'k' to show next line.\n")
+    print("press 'z' to show last chapter.\n")
+    print("press 'x' to show next chapter.\n")
+    print("press 'c' to show chapter table of contents.\n")
     print("press 'q' to quit.\n")
     print("press 'i' to input other commond.\n")
     print("  -  input find `xxx` to show all occurrences of lines and subscripts(support lua wildcards).\n")
-    print("  -  input jump `xxx` to skip to the first occurrence of the full text, often used with the 'jump' command.")
+    print("  -  input jump `xxx` to skip to the first occurrence of the full text, often used with the 'c' and 'i find' command.")
 end
 CMD.H = CMD.h
 
@@ -167,7 +218,7 @@ SCMD.jump = function(...)
     local content = ...
     local jump_seek
     for i, value in ipairs(file_lines_cache) do
-        if value:find(content, nil, true) then
+        if value:find(content) then
             jump_seek = i
             break
         end
