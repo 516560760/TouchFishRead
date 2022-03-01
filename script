@@ -7,7 +7,8 @@ local CMD_FAILED = -1
 
 local file = nil
 local filename = nil
-local directorywildcard = "第.+章"
+local directory_wildcard = nil
+local match_directory_wildcard = nil
 local file_lines_cache = {}
 local file_chapter_cacke = {}
 local file_seeks = {}
@@ -59,16 +60,17 @@ end
 function initfile(name)
     filename = name
     table.insert(file_seeks, 0)
-    local mulu = io.open("./directorywildcard", "r")
-    directorywildcard = mulu:read('*a')
+    local mulu = io.open("./directory_wildcard", "r")
+    directory_wildcard = mulu:read('*a')
+    match_directory_wildcard = "(" .. directory_wildcard .. ")"
     mulu:close()
     while true do
         local line = file:read('*l')
         if not line then break end
         table.insert(file_lines_cache, line)
         table.insert(file_seeks, file:seek('cur', 0))
-        if line:find(directorywildcard) then
-            table.insert(file_chapter_cacke, {seek = file_seeks[#file_seeks - 1], seek_offset = #file_seeks - 1})
+        if line:find(directory_wildcard) then
+            table.insert(file_chapter_cacke, {seek = file_seeks[#file_seeks - 1], seek_offset = #file_seeks - 1, chapter_name = line:match(match_directory_wildcard)})
         end
     end
     local libfile = io.open("libfile", "r")
@@ -97,7 +99,14 @@ function readfile(continue)
     local line = file:read('*l')
     if line then
         if #line > 0 then
-            print(line)
+            local chapter_name
+            for chapter_offset = #file_chapter_cacke, 1, -1 do
+                if file_seeks[file_seeks_offset] >= file_chapter_cacke[chapter_offset].seek then
+                    chapter_name = file_chapter_cacke[chapter_offset].chapter_name
+                    break
+                end
+            end
+            print(string.format("%s (%s)", line, chapter_name))
         else
             if continue then
                 continue()
@@ -124,7 +133,7 @@ CMD.K = CMD.k
 
 CMD.c = function()
     for i, line in ipairs(file_lines_cache) do
-        if line:find(directorywildcard) then
+        if line:find(directory_wildcard) then
             print(string.format("%s\n", line))
         end
     end
@@ -202,6 +211,10 @@ end
 
 SCMD.find = function(...)
     local content = ...
+    -- local directory_wildcard = io.open("./directory_wildcard", "w+")
+    -- directory_wildcard:write(content)
+    -- directory_wildcard:flush()
+    -- directory_wildcard:close()
     local is_find = false
     for i, value in ipairs(file_lines_cache) do
         if value:find(content) then
