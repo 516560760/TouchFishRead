@@ -18,7 +18,11 @@ local CMD = {}
 local SCMD = {}
 
 print = function(...)
-    io.output():write(...)
+    local output = {...}
+    for index, value in ipairs(output) do
+        output[index] = tostring(value)
+    end
+    io.output():write(unpack(output))
 end
 
 function string.split(str, sep, count)
@@ -106,7 +110,11 @@ function readfile(continue)
                     break
                 end
             end
-            print(string.format("%s (%s)", line, chapter_name))
+            if chapter_name then
+                print(string.format("%s (%s)", line, tostring(chapter_name)))
+            else
+                print(line)
+            end
         else
             if continue then
                 continue()
@@ -193,6 +201,7 @@ CMD.h = function()
     print("press 'i' to input other commond.\n")
     print("  -  input find `xxx` to show all occurrences of lines and subscripts(support lua wildcards).\n")
     print("  -  input jump `xxx` to skip to the first occurrence of the full text, often used with the 'c' and 'i find' command.")
+    
 end
 CMD.H = CMD.h
 
@@ -269,7 +278,8 @@ function LOAD_FILE(name)
     if file then
         print("wait please in loading...\n")
         initfile(name)
-        print("loading success, welcome come touchfish! --by Gx.\npress 'h' for help.")
+        print("note: please convert to ANSI(GBK) encoding.\n")
+        print("loading success, welcome come touchfish! --by Gx.\npress 'h' for help.\n")
         return CMD_SUCCESS
     else
         print("load failed file")
